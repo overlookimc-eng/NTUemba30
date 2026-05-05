@@ -1,4 +1,3 @@
-
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -287,9 +286,27 @@ function renderStats(rows, payRows){
     !isGroupRow(r) && isMainRow(r) && (r[1]||'').trim()
   );
   const total = data.length;
-  const done  = data.filter(r=>parseFloat(r[3]||0)>=1).length;
-  const wip   = data.filter(r=>{const p=parseFloat(r[3]||0);return p>0&&p<1;}).length;
-  const avg   = total>0 ? Math.round(data.reduce((s,r)=>s+parseFloat(r[3]||0)*100,0)/total) : 0;
+  // D欄整體進度%：先嘗試解析數字，公式字串則回傳 NaN
+  function getPct(r){
+    const v = (r[3]||'').trim();
+    // 公式字串（以=開頭）或空值 → 從 F~J 欄推算
+    if(v===''||v.startsWith('=')){
+      const statCols = [r[5],r[6],r[7],r[8],r[9]];
+      const valid = statCols.filter(s=>s&&s.trim()!==''&&s.trim()!=='—'&&s.trim()!==' —');
+      const doneC = valid.filter(s=>s.includes('✅')||s.includes('完成')).length;
+      return valid.length>0 ? doneC/valid.length : 0;
+    }
+    const n = parseFloat(v);
+    return isNaN(n)?0:(n>1?n/100:n); // 支援 0.5 和 50% 兩種格式
+  }
+  const done  = data.filter(r=>getPct(r)>=1).length;
+  const wip   = data.filter(r=>{
+    // 進行中：任一狀態欄含進行中，或 D 欄 0<pct<1
+    const p=getPct(r);
+    const hasWip=[r[5],r[6],r[7],r[8],r[9]].some(s=>s&&(s.includes('🔵')||s.includes('🔄')||s.includes('進行中')));
+    return hasWip||(p>0&&p<1);
+  }).length;
+  const avg   = total>0 ? Math.round(data.reduce((s,r)=>s+getPct(r)*100,0)/total) : 0;
   const days  = Math.ceil((new Date('2026-10-17')-new Date())/864e5);
 
   // 總金額：從請款明細 G欄（含稅）加總
@@ -318,7 +335,7 @@ function renderMilestones(rows){
     const b=(r[1]||'').trim(), c=(r[2]||'').trim(), d=(r[3]||'').trim(), e=(r[4]||'').trim();
     if(b==='里程碑事項'){on=true;continue;}
     if(!on||!b) continue;
-    if(b==='請款月份') break;
+    if(b==='請款月份'||(r[0]||'').includes('請款')) break;
     const n  = daysLeft(c);
     const passed  = n!==null&&n<0;
     const urgent  = d.includes('緊急')||(n!==null&&n>=0&&n<=7);
@@ -359,13 +376,27 @@ function renderItems(rows){
     // 列的 class
     const rowCls = hasWarn?'wr': main?'mr': 'sr';
 
-    // 序號：A欄可能是日期格式，過濾掉非整數
+    // 序號：A欄可能是日期(2026-01-01)或整數，提取月份數字作為群組識別
     const seqRaw = (r[0]||'').trim();
-    const seq = /^\d+$/.test(seqRaw) ? seqRaw : '';
+    // 若是整數直接顯示，若是日期則留空（用B欄名稱識別即可）
+    const seq = /^\d{1,2}$/.test(seqRaw) ? seqRaw : '';
 
     // 進度條：主品項 & 子項目都顯示（公式欄位 D）
-    const pctCell = (r[3]||'').trim();
-    const pctDisplay = pbar(pctCell);
+    // pctCell 已改用 getPctLocal(r) 計算
+    // D欄可能是公式字串，需要從狀態欄推算
+    function getPctLocal(r){
+      const v=(r[3]||'').trim();
+      if(v===''||v.startsWith('=')){
+        const sc=[r[5],r[6],r[7],r[8],r[9]];
+        const vd=sc.filter(s=>s&&s.trim()!==''&&s.trim()!=='—'&&s.trim()!==' —');
+        const dk=vd.filter(s=>s.includes('✅')||s.includes('完成')).length;
+        const wp=vd.filter(s=>s.includes('🔵')||s.includes('🔄')||s.includes('進行中')).length;
+        return vd.length>0?(dk+wp*0.5)/vd.length:0;
+      }
+      const n=parseFloat(v); return isNaN(n)?0:(n>1?n/100:n);
+    }
+    const pctVal2 = getPctLocal(r);
+    const pctDisplay = pbar(pctVal2);
 
     // 日期格式化
     const dateStr = fmtDate(r[4]);
