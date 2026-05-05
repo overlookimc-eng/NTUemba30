@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -151,7 +152,7 @@ footer{text-align:center;padding:1.2rem;font-size:.64rem;color:var(--hn);border-
 </footer>
 
 <script>
-const SID = 14Rx7Mq2ojEztvd1KnmYFsLYKgCnTkDR0EPTcNFoqyjM ;
+const SID = '14Rx7Mq2ojEztvd1KnmYFsLYKgCnTkDR0EPTcNFoqyjM';
 const S = {
   dash: '🏠 總覽儀表板',
   prog: '📋 作品進度追蹤',
